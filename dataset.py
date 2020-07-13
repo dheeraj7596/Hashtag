@@ -5,6 +5,8 @@ from torch.utils.data import Dataset, DataLoader
 
 class Language(object):
     def __init__(self, tweets, news, vocab_limit=None):
+        # Vocabulary is created from tweets, news but not hashtags now.
+
         self.tweets = tweets
         self.news = news
 
@@ -42,7 +44,7 @@ class Language(object):
 
 
 class TweetNewsDataset(Dataset):
-    def __init__(self, data_dir, use_cuda, max_tweet_len=128, max_news_len=100, max_hashtag_len=100, type="train",
+    def __init__(self, data_dir, use_cuda, lang=None, max_tweet_len=128, max_news_len=100, max_hashtag_len=100,
                  vocab_limit=None, use_extended_vocab=True):
         self.data_dir = data_dir
         self.tweet_file = self.data_dir + "/tweets.txt"
@@ -75,23 +77,10 @@ class TweetNewsDataset(Dataset):
                 mod_line = line.strip()
                 self.hashtags.append(mod_line)
 
-        assert len(self.hashtags) == len(self.news) == len(self.tweets)
-        self.lang = Language(self.tweets, self.news, vocab_limit=vocab_limit)
+        if lang is None:
+            lang = Language(self.tweets, self.news, vocab_limit=vocab_limit)
 
-        if type == "train":
-            start = 0
-            end = int(0.8 * len(self.hashtags))
-        elif type == "val":
-            start = int(0.8 * len(self.hashtags))
-            end = start + int(0.1 * len(self.hashtags))
-        else:
-            assert type == "test"
-            start = int(0.8 * len(self.hashtags)) + int(0.1 * len(self.hashtags))
-            end = len(self.hashtags)
-
-        self.tweets = self.tweets[start:end]
-        self.news = self.news[start:end]
-        self.hashtags = self.hashtags[start:end]
+        self.lang = lang
         assert len(self.hashtags) == len(self.news) == len(self.tweets)
 
     def __len__(self):
@@ -102,9 +91,9 @@ class TweetNewsDataset(Dataset):
         news_token_list = self.news[idx].strip().split()
         hashtag_token_list = self.hashtags[idx].strip().split()
 
-        tweet_token_list = (['<SOS>'] + tweet_token_list + ['<EOS>'])[:self.max_tweet_len]
-        news_token_list = (['<SOS>'] + news_token_list + ['<EOS>'])[:self.max_news_len]
-        hashtag_token_list = ['<SOS>'] + hashtag_token_list + ['<EOS>'][:self.max_hashtag_len]
+        tweet_token_list = ['<SOS>'] + tweet_token_list[:self.max_tweet_len - 2] + ['<EOS>']
+        news_token_list = ['<SOS>'] + news_token_list[:self.max_news_len - 2] + ['<EOS>']
+        hashtag_token_list = ['<SOS>'] + hashtag_token_list[:self.max_hashtag_len - 2] + ['<EOS>']
 
         tweet_seq = tokens_to_seq(tweet_token_list, self.lang.tok_to_idx, self.max_tweet_len, self.use_extended_vocab)
         news_seq = tokens_to_seq(news_token_list, self.lang.tok_to_idx, self.max_news_len, self.use_extended_vocab)
@@ -125,7 +114,7 @@ if __name__ == '__main__':
     # todo make all the news in one file
     # todo make all the hashtags in one file with one hashtag per line
 
-    dataset = TweetNewsDataset("./data/train/", use_cuda=False, type="train")
+    dataset = TweetNewsDataset("./data/train/", use_cuda=False)
     data_loader = DataLoader(dataset, batch_size=128, shuffle=True)
     count = 0
     for tweet_seq, news_seq, output_seq, tweet_str, news_str, hashtag_str in data_loader:
