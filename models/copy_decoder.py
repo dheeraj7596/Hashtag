@@ -8,6 +8,7 @@ class CopyDecoder(nn.Module):
     def __init__(self, hidden_size, embedding_size, lang: Language, max_tweet_length, max_news_length,
                  max_hashtag_length, tweet_cov_loss_factor=0, news_cov_loss_factor=0):
         super().__init__()
+        self.EPS = 1e-8
         self.hidden_size = hidden_size
         self.embedding_size = embedding_size
         self.lang = lang
@@ -122,7 +123,7 @@ class CopyDecoder(nn.Module):
         coverage_loss = coverage_loss / (self.max_hashtag_length * batch_size)
 
         # Since we are using NLL loss, returning log probabilities
-        return torch.log(decoder_outputs), sampled_idxs, coverage_loss
+        return torch.log(decoder_outputs + self.EPS), sampled_idxs, coverage_loss
 
     def step(self, prev_idx, prev_hidden, encoder_outputs, input_tweets, input_news, lengths_tweets, lengths_news,
              tweet_coverage_vec, news_coverage_vec, dropout_mask=None):
@@ -162,9 +163,9 @@ class CopyDecoder(nn.Module):
             append_for_copy = append_for_copy.cuda()
         output = torch.cat([output, append_for_copy], dim=-1)
 
-        p_gen = F.sigmoid(self.gen_context_linear(context) +
-                          self.state_linear(prev_hidden).view(batch_size, 1, -1) +
-                          self.input_linear(embedded)).squeeze(1)
+        p_gen = (self.gen_context_linear(context) +
+                 self.state_linear(prev_hidden).view(batch_size, 1, -1) +
+                 self.input_linear(embedded)).squeeze(1)
 
         assert encoder_outputs.shape[1] == (lengths_tweets.max() + lengths_news.max())
         tweet_encoder_outputs = encoder_outputs[:, :lengths_tweets.max(), :]
@@ -201,7 +202,7 @@ class CopyDecoder(nn.Module):
 
     def copy_from_source(self, src_encoder_outputs, src_attn_weights, copy_from_src_linear):
         context = torch.bmm(src_attn_weights, src_encoder_outputs)  # weighted sum of encoder_outputs (i.e. values)
-        p_copy = F.sigmoid(copy_from_src_linear(context))
+        p_copy = copy_from_src_linear(context)
         return p_copy
 
     def init_hidden(self, batch_size):
