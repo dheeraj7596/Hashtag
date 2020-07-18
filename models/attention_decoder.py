@@ -20,8 +20,8 @@ class AttentionDecoder(nn.Module):
         self.gru = nn.GRU(self.hidden_size + self.embedding_size, self.hidden_size, batch_first=True)
         self.out = nn.Linear(self.hidden_size, len(lang.tok_to_idx))
 
-    def forward(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None, keep_prob=1.0,
-                teacher_forcing=0.0):
+    def forward(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None,
+                lengths_tweets=None, lengths_news=None, keep_prob=1.0, teacher_forcing=0.0):
         batch_size = encoder_outputs.data.shape[0]
 
         hidden = torch.zeros(1, batch_size, self.hidden_size)  # overwrite the encoder hidden state with zeros
@@ -49,7 +49,6 @@ class AttentionDecoder(nn.Module):
         dropout_mask = dropout_mask.float() / keep_prob
 
         for step_idx in range(1, self.max_length):
-
             if targets is not None and teacher_forcing > 0.0:
                 # replace some inputs with the targets (i.e. teacher forcing)
                 teacher_forcing_mask = torch.rand((batch_size, 1)) <= teacher_forcing
@@ -68,19 +67,12 @@ class AttentionDecoder(nn.Module):
         decoder_outputs = torch.stack(decoder_outputs, dim=1)
         sampled_idxs = torch.stack(sampled_idxs, dim=1)
 
-        return decoder_outputs, sampled_idxs
+        return decoder_outputs, sampled_idxs, 0
 
     def step(self, prev_idx, prev_hidden, encoder_outputs, dropout_mask=None):
 
         batch_size = prev_idx.shape[0]
         vocab_size = len(self.lang.tok_to_idx)
-
-        # encoder_output * W * decoder_hidden for each encoder_output
-        transformed_hidden = self.attn_W(prev_hidden).view(batch_size, self.hidden_size, 1)
-        # reduce encoder outputs and hidden to get scores. remove singleton dimension from multiplication.
-        scores = torch.bmm(encoder_outputs, transformed_hidden).squeeze(2)
-        attn_weights = F.softmax(scores, dim=1).unsqueeze(1)  # apply softmax to scores to get normalized weights
-        context = torch.bmm(attn_weights, encoder_outputs)  # weighted sum of encoder_outputs (i.e. values)
 
         out_of_vocab_mask = prev_idx > vocab_size  # [b, 1] bools indicating which seqs copied on the previous step
         unks = torch.ones_like(prev_idx).long() * 3  # 3 is unk_token index
@@ -88,6 +80,13 @@ class AttentionDecoder(nn.Module):
                                            unks)  # replace copied tokens with <UNK> token before embedding
 
         embedded = self.embedding(prev_idx)  # embed input (i.e. previous output token)
+
+        # encoder_output * W * decoder_hidden for each encoder_output
+        transformed_hidden = self.attn_W(prev_hidden).view(batch_size, self.hidden_size, 1)
+        # reduce encoder outputs and hidden to get scores. remove singleton dimension from multiplication.
+        scores = torch.bmm(encoder_outputs, transformed_hidden).squeeze(2)
+        attn_weights = F.softmax(scores, dim=1).unsqueeze(1)  # apply softmax to scores to get normalized weights
+        context = torch.bmm(attn_weights, encoder_outputs)  # weighted sum of encoder_outputs (i.e. values)
 
         rnn_input = torch.cat((context, embedded), dim=2)
         if dropout_mask is not None:

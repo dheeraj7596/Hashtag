@@ -12,10 +12,11 @@ class RNNEncoder(nn.Module):
         self.embedding.weight.data.normal_(0, 1 / self.embedding_size ** 0.5)
         self.gru = nn.GRU(embedding_size, hidden_size, bidirectional=True, batch_first=True)
 
-    def forward(self, input_tweets, input_news, hidden, lengths_tweets, lengths_news):
-        # since we are pack_padding, input batch must be sorted by sequence length
-
+    def forward(self, input_tweets, input_news, lengths_tweets, lengths_news):
         # replace OOV words with <UNK> before embedding
+        batch_size = input_tweets.data.shape[0]
+        hidden = self.init_hidden(batch_size)
+
         input_tweets = input_tweets.masked_fill(input_tweets > self.embedding.num_embeddings, 3)
 
         sorted_tweets_lengths, tweets_lengths_idx_sort = torch.sort(lengths_tweets, dim=0, descending=True)

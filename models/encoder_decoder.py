@@ -2,11 +2,14 @@ from models.util import seq_to_string, tokens_to_seq
 import torch
 from torch import nn
 from models.rnn_encoder import RNNEncoder
+from models.biattention_encoder import BiAttentionEncoder
 from models.attention_decoder import AttentionDecoder
+from models.copy_decoder import CopyDecoder
 
 
 class EncoderDecoder(nn.Module):
-    def __init__(self, lang, max_hashtag_length, hidden_size, embedding_size, encoder_type, decoder_type):
+    def __init__(self, lang, max_tweet_length, max_news_length, max_hashtag_length, hidden_size, embedding_size,
+                 encoder_type, decoder_type, tweet_cov_loss_factor=0, news_cov_loss_factor=0):
         super(EncoderDecoder, self).__init__()
 
         self.lang = lang
@@ -18,9 +21,9 @@ class EncoderDecoder(nn.Module):
                                       hidden_size=hidden_size,
                                       embedding_size=embedding_size)
         elif self.encoder_type == "biattention":
-            self.encoder = BiAttentionEncoder(len(self.lang.tok_to_idx),
-                                              hidden_size,
-                                              embedding_size)
+            self.encoder = BiAttentionEncoder(input_size=len(self.lang.tok_to_idx),
+                                              hidden_size=hidden_size,
+                                              embedding_size=embedding_size)
         else:
             raise ValueError("decoder_type must be 'rnn' or 'biattention'")
 
@@ -32,32 +35,33 @@ class EncoderDecoder(nn.Module):
                                             lang=lang,
                                             max_hashtag_length=max_hashtag_length)
         elif self.decoder_type == 'copy':
-            self.decoder = CopyNetDecoder(decoder_hidden_size,
-                                          embedding_size,
-                                          lang,
-                                          max_hashtag_length)
+            self.decoder = CopyDecoder(hidden_size=decoder_hidden_size,
+                                       embedding_size=embedding_size,
+                                       lang=lang,
+                                       max_tweet_length=max_tweet_length,
+                                       max_news_length=max_news_length,
+                                       max_hashtag_length=max_hashtag_length,
+                                       tweet_cov_loss_factor=tweet_cov_loss_factor,
+                                       news_cov_loss_factor=news_cov_loss_factor)
         else:
             raise ValueError("decoder_type must be 'attn' or 'copy'")
 
     def forward(self, input_tweets, input_news, lengths_tweets, lengths_news, targets=None, keep_prob=1.0,
                 teacher_forcing=0.0):
-
-        batch_size = input_tweets.data.shape[0]
-        hidden = self.encoder.init_hidden(batch_size)
-
         encoder_outputs, hidden = self.encoder(input_tweets,
                                                input_news,
-                                               hidden,
                                                lengths_tweets,
                                                lengths_news)
 
-        decoder_outputs, sampled_idxs = self.decoder(encoder_outputs,
-                                                     input_tweets,
-                                                     input_news,
-                                                     hidden,
-                                                     targets=targets,
-                                                     teacher_forcing=teacher_forcing)
-        return decoder_outputs, sampled_idxs
+        decoder_outputs, sampled_idxs, cov_loss = self.decoder(encoder_outputs,
+                                                               input_tweets,
+                                                               input_news,
+                                                               hidden,
+                                                               lengths_tweets=lengths_tweets,
+                                                               lengths_news=lengths_news,
+                                                               targets=targets,
+                                                               teacher_forcing=teacher_forcing)
+        return decoder_outputs, sampled_idxs, cov_loss
 
     def get_response(self, tweet_string, news_string):
         use_extended_vocab = not isinstance(self.decoder, AttentionDecoder)
