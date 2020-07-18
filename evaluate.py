@@ -25,10 +25,10 @@ def evaluate(encoder_decoder: EncoderDecoder, data_loader):
 
         batch_size = tweet_idxs.shape[0]
 
-        output_log_probs, output_seqs = encoder_decoder(tweet_idxs,
-                                                        news_idxs,
-                                                        tweet_lengths,
-                                                        news_lengths)
+        output_log_probs, output_seqs, cov_loss = encoder_decoder(tweet_idxs,
+                                                                  news_idxs,
+                                                                  tweet_lengths,
+                                                                  news_lengths)
 
         all_output_seqs.extend(trim_seqs(output_seqs))
         all_target_seqs.extend([list(seq[seq > 0])] for seq in to_np(target_idxs))

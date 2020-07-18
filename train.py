@@ -77,10 +77,10 @@ def train(encoder_decoder: EncoderDecoder,
                 writer.add_scalar('train_batch_loss', batch_loss, global_step)
                 writer.add_scalar('train_batch_bleu_score', batch_bleu_score, global_step)
 
-                for tag, value in encoder_decoder.named_parameters():
-                    tag = tag.replace('.', '/')
-                    writer.add_histogram('weights/' + tag, value, global_step, bins='doane')
-                    writer.add_histogram('grads/' + tag, to_np(value.grad), global_step, bins='doane')
+                # for tag, value in encoder_decoder.named_parameters():
+                #     tag = tag.replace('.', '/')
+                #     writer.add_histogram('weights/' + tag, value, global_step, bins='doane')
+                #     writer.add_histogram('grads/' + tag, to_np(value.grad), global_step, bins='doane')
 
             global_step += 1
 
@@ -199,7 +199,7 @@ def main(model_name, model_dump_path, train_dir, val_dir, use_cuda, batch_size, 
           keep_prob,
           teacher_forcing_schedule,
           lr,
-          encoder_decoder.decoder.max_length)
+          encoder_decoder.decoder.max_hashtag_length)
 
 
 if __name__ == '__main__':

@@ -59,7 +59,7 @@ class BiAttentionEncoder(nn.Module):
         sorted_lengths, lengths_idx_sort = torch.sort(lengths, dim=0, descending=True)
         _, lengths_idx_unsort = torch.sort(lengths_idx_sort, dim=0)
 
-        input = input[lengths_idx_sort, :]
+        input = input[lengths_idx_sort, :][:, :lengths.max()]
         embedded = self.embedding(input)
         packed_embedded = torch.nn.utils.rnn.pack_padded_sequence(embedded, sorted_lengths, batch_first=True)
         gru.flatten_parameters()

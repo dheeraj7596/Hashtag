@@ -43,6 +43,9 @@ class CopyDecoder(nn.Module):
         assert lengths_tweets is not None
         assert lengths_news is not None
 
+        input_tweets = input_tweets[:, :lengths_tweets.max()]
+        input_news = input_news[:, :lengths_news.max()]
+
         batch_size = encoder_outputs.data.shape[0]
         tweet_coverage_vec = torch.zeros(batch_size, 1, self.max_tweet_length)
         news_coverage_vec = torch.zeros(batch_size, 1, self.max_news_length)
@@ -54,7 +57,8 @@ class CopyDecoder(nn.Module):
             hidden = hidden
 
         # every decoder output seq starts with <SOS>
-        sos_output = torch.zeros((batch_size, self.embedding.num_embeddings))
+        sos_output = torch.zeros(
+            (batch_size, self.embedding.num_embeddings + lengths_tweets.max() + lengths_news.max()))
         sos_output[:, 1] = 1.0  # index 1 is the <SOS> token, one-hot encoding
         sos_idx = torch.ones((batch_size, 1)).long()
 
@@ -91,12 +95,18 @@ class CopyDecoder(nn.Module):
                                                                                         news_coverage_vec,
                                                                                         dropout_mask=dropout_mask)
 
-            tweet_cov_loss = self.tweet_cov_loss_factor * torch.min(tweet_coverage_vec, copy_tweet_attn_weights).sum()
-            news_cov_loss = self.news_cov_loss_factor * torch.min(news_coverage_vec, copy_news_attn_weights).sum()
+            temp_copy_tweet_attn_weights = torch.zeros_like(tweet_coverage_vec)
+            temp_copy_tweet_attn_weights[:, :, :copy_tweet_attn_weights.shape[2]] = copy_tweet_attn_weights
+            temp_copy_news_attn_weights = torch.zeros_like(news_coverage_vec)
+            temp_copy_news_attn_weights[:, :, :copy_news_attn_weights.shape[2]] = copy_news_attn_weights
+
+            tweet_cov_loss = self.tweet_cov_loss_factor * torch.min(tweet_coverage_vec,
+                                                                    temp_copy_tweet_attn_weights).sum()
+            news_cov_loss = self.news_cov_loss_factor * torch.min(news_coverage_vec, temp_copy_news_attn_weights).sum()
 
             coverage_loss = coverage_loss + tweet_cov_loss + news_cov_loss
-            tweet_coverage_vec += copy_tweet_attn_weights
-            news_coverage_vec += copy_news_attn_weights
+            tweet_coverage_vec = tweet_coverage_vec + temp_copy_tweet_attn_weights
+            news_coverage_vec = news_coverage_vec + temp_copy_news_attn_weights
 
             decoder_outputs.append(output)
             _, topi = decoder_outputs[-1].topk(1)
@@ -146,8 +156,9 @@ class CopyDecoder(nn.Module):
         append_for_copy = torch.zeros((batch_size, lengths_tweets.max() + lengths_news.max()))
         output = torch.cat([output, append_for_copy], dim=-1)
 
-        p_gen = F.sigmoid(
-            self.gen_context_linear(context) + self.state_linear(prev_hidden) + self.input_linear(embedded))
+        p_gen = F.sigmoid(self.gen_context_linear(context) +
+                          self.state_linear(prev_hidden).view(batch_size, 1, -1) +
+                          self.input_linear(embedded)).squeeze(1)
 
         assert encoder_outputs.shape[1] == (lengths_tweets.max() + lengths_news.max())
         tweet_encoder_outputs = encoder_outputs[:, :lengths_tweets.max(), :]
@@ -158,23 +169,23 @@ class CopyDecoder(nn.Module):
 
         p_copy_tweets = self.copy_from_source(tweet_encoder_outputs,
                                               copy_tweet_attn_weights,
-                                              self.copy_tweets_context_linear)
+                                              self.copy_tweets_context_linear).squeeze(1)
         p_copy_news = self.copy_from_source(news_encoder_outputs,
                                             copy_news_attn_weights,
-                                            self.copy_news_context_linear)
+                                            self.copy_news_context_linear).squeeze(1)
 
         temp = torch.cat([p_gen, p_copy_tweets, p_copy_news], dim=-1)
         temp = F.softmax(temp, dim=-1)
-        p_gen = temp[:, 0]
-        p_copy_tweets = temp[:, 1]
-        p_copy_news = temp[:, 2]
+        p_gen = temp[:, 0].unsqueeze(1)
+        p_copy_tweets = temp[:, 1].unsqueeze(1)
+        p_copy_news = temp[:, 2].unsqueeze(1)
 
         probs = torch.zeros(batch_size, vocab_size + lengths_tweets.max() + lengths_news.max())
         tweet_copy_probabilities = torch.zeros_like(probs)
-        tweet_copy_probabilities.scatter_add_(1, input_tweets, copy_tweet_attn_weights)
+        tweet_copy_probabilities.scatter_add_(1, input_tweets, copy_tweet_attn_weights.squeeze(1))
 
         news_copy_probabilities = torch.zeros_like(probs)
-        news_copy_probabilities.scatter_add_(1, input_news, copy_news_attn_weights)
+        news_copy_probabilities.scatter_add_(1, input_news, copy_news_attn_weights.squeeze(1))
 
         probs = p_gen * output + p_copy_tweets * tweet_copy_probabilities + p_copy_news * news_copy_probabilities
 

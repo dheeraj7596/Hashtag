@@ -22,7 +22,7 @@ class RNNEncoder(nn.Module):
         sorted_tweets_lengths, tweets_lengths_idx_sort = torch.sort(lengths_tweets, dim=0, descending=True)
         _, tweets_lengths_idx_unsort = torch.sort(tweets_lengths_idx_sort, dim=0)
 
-        input_tweets = input_tweets[tweets_lengths_idx_sort, :]
+        input_tweets = input_tweets[tweets_lengths_idx_sort, :][:, :lengths_tweets.max()]
 
         embedded = self.embedding(input_tweets)
         packed_embedded = torch.nn.utils.rnn.pack_padded_sequence(embedded, sorted_tweets_lengths, batch_first=True)

@@ -83,8 +83,8 @@ class EncoderDecoder(nn.Module):
             input_variable = input_variable.cuda()
             news_variable = news_variable.cuda()
 
-        outputs, idxs = self.forward(input_variable, news_variable, torch.LongTensor([len(input_seq)]),
-                                     torch.LongTensor([len(news_seq)]))
+        outputs, idxs, cov_loss = self.forward(input_variable, news_variable, torch.LongTensor([len(input_seq)]),
+                                               torch.LongTensor([len(news_seq)]))
         idxs = idxs.data.view(-1)
         eos_idx = list(idxs).index(2) if 2 in list(idxs) else len(idxs)
         output_string = seq_to_string(idxs[:eos_idx + 1], idx_to_tok, input_tokens=input_tokens)

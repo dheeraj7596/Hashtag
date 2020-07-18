@@ -10,7 +10,7 @@ class AttentionDecoder(nn.Module):
         self.hidden_size = hidden_size
         self.embedding_size = embedding_size
         self.lang = lang
-        self.max_length = max_hashtag_length
+        self.max_hashtag_length = max_hashtag_length
 
         self.embedding = nn.Embedding(len(lang.tok_to_idx), self.embedding_size, padding_idx=0)
         self.embedding.weight.data.normal_(0, 1 / self.embedding_size ** 0.5)
@@ -48,7 +48,7 @@ class AttentionDecoder(nn.Module):
         dropout_mask = dropout_mask <= keep_prob
         dropout_mask = dropout_mask.float() / keep_prob
 
-        for step_idx in range(1, self.max_length):
+        for step_idx in range(1, self.max_hashtag_length):
             if targets is not None and teacher_forcing > 0.0:
                 # replace some inputs with the targets (i.e. teacher forcing)
                 teacher_forcing_mask = torch.rand((batch_size, 1)) <= teacher_forcing
