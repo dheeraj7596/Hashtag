@@ -100,11 +100,11 @@ def train(encoder_decoder: EncoderDecoder,
         decoder_vocab = encoder_decoder.lang.tok_to_idx.keys()
         writer.add_embedding(decoder_embeddings, metadata=decoder_vocab, global_step=0, tag='decoder_embeddings')
 
-        tweet_string = "do you think brett kavanaugh should be confirmed as a justice on the supreme court"
-        news_string = "leading catholic publication turns on brett kavanaugh says his nomination to the supreme court should be withdrawn"
+        tweet_string = "should ask dr ford 1 important question why did you go upstairs to go to the bathroom 99 of 2 story houses have a bathroom downstairs common sense bedrooms are upstairs cbc news fox news real donald trump cnn"
+        news_string = "america supreme court brett kavanuagh senate judiciary committee christine blasey ford cnn fox news supreme court bill clinton kavanaugh new york ford donald trump rod rosenstein new york times trump trump maine alaska tara d sonenshine us george washington university elliott school of international affairs christine blasey ford senate judiciary committee fox news ford fox news chris wallace ford wallace bret baier ford brit hume fox news bret baier ford chris wallace david mack andrew napolitano ford rachel mitchell fox news andrew napolitano ford rachel mitchell keith boykin fox kavanaugh ford ford twitter america supreme court brett kavanuagh senate judiciary committee christine blasey ford cnn fox news supreme court bill clinton kavanaugh new york ford donald trump rod rosenstein new york times trump trump maine alaska tara d sonenshine us george washington university elliott school of international affairs fox news sean hannity donald trump fox news fox news cnn msnbc pbs news gallupknight foundation gallupknight foundation gallup knight foundation christine blasey ford senate judiciary committee fox news ford fox news chris wallace ford wallace bret baier ford brit hume fox news bret baier ford chris wallace david mack andrew napolitano ford rachel mitchell fox news andrew napolitano ford rachel mitchell keith boykin fox kavanaugh ford ford twitter"
         output_string = encoder_decoder.get_response(tweet_string, news_string)
-        writer.add_text('kavanaugh', output_string, global_step=global_step)
-        print("Global Step: ", global_step, ' kavanaugh ', output_string)
+        writer.add_text('christine blasey ford', output_string, global_step=global_step)
+        print("Global Step: ", global_step, ' christine blasey ford ', output_string)
 
         print('val loss: %.5f, val BLEU score: %.5f' % (val_loss, val_bleu_score), flush=True)
         torch.save(encoder_decoder, "%s%s_%i.pt" % (model_path, model_name, epoch))
