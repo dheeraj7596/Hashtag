@@ -44,12 +44,12 @@ def evaluate(encoder_decoder: EncoderDecoder, data_loader):
     return mean_loss, bleu_score
 
 
-def print_output(tweet_seq, news_seq, encoder_decoder: EncoderDecoder, input_tokens=None, news_tokens=None,
+def print_output(tweet_seq, news_seq, encoder_decoder: EncoderDecoder, tweet_tokens=None, news_tokens=None,
                  target_tokens=None, target_seq=None):
     idx_to_tok = encoder_decoder.lang.idx_to_tok
 
-    if input_tokens is not None:
-        input_tweets_string = ' '.join(input_tokens)
+    if tweet_tokens is not None:
+        input_tweets_string = ' '.join(tweet_tokens)
     else:
         input_tweets_string = seq_to_string(tweet_seq, idx_to_tok)
 
@@ -68,7 +68,7 @@ def print_output(tweet_seq, news_seq, encoder_decoder: EncoderDecoder, input_tok
     if target_tokens is not None:
         target_string = ' '.join(target_tokens)
     elif target_seq is not None:
-        target_string = seq_to_string(target_seq, idx_to_tok, input_tokens=input_tokens)
+        target_string = seq_to_string(target_seq, idx_to_tok, input_tokens=tweet_tokens + news_tokens)
     else:
         target_string = ''
 
@@ -89,7 +89,7 @@ def print_output(tweet_seq, news_seq, encoder_decoder: EncoderDecoder, input_tok
                                     lengths_news)
     idxs = idxs.data.view(-1)
     eos_idx = list(idxs).index(2) if 2 in list(idxs) else len(idxs)
-    string = seq_to_string(idxs[:eos_idx + 1], idx_to_tok, input_tokens=input_tokens)
+    string = seq_to_string(idxs[:eos_idx + 1], idx_to_tok, input_tokens=tweet_tokens + news_tokens)
     log_prob = sum([outputs[0, step_idx, idx] for step_idx, idx in enumerate(idxs[:eos_idx + 1])])
 
     print('>', input_tweets_string, '\n', flush=True)
@@ -152,7 +152,7 @@ def main(model_dump_path, test_dir, model_name, use_cuda, max_tweet_len, max_new
             n_tokens = news_str.strip().split()
             t_tokens = news_str.strip().split()
 
-            print_output(i_seq, n_seq, encoder_decoder, input_tokens=i_tokens, news_tokens=n_tokens,
+            print_output(i_seq, n_seq, encoder_decoder, tweet_tokens=i_tokens, news_tokens=n_tokens,
                          target_tokens=t_tokens, target_seq=t_seq)
 
     else:

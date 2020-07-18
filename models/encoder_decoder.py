@@ -69,9 +69,9 @@ class EncoderDecoder(nn.Module):
         idx_to_tok = self.lang.idx_to_tok
         tok_to_idx = self.lang.tok_to_idx
 
-        input_tokens = tweet_string.strip().split()
-        input_tokens = ['<SOS>'] + [token.lower() for token in input_tokens] + ['<EOS>']
-        input_seq = tokens_to_seq(input_tokens, tok_to_idx, len(input_tokens), use_extended_vocab)
+        tweet_tokens = tweet_string.strip().split()
+        tweet_tokens = ['<SOS>'] + [token.lower() for token in tweet_tokens] + ['<EOS>']
+        input_seq = tokens_to_seq(tweet_tokens, tok_to_idx, len(tweet_tokens), use_extended_vocab)
         input_variable = input_seq.view(1, -1)
 
         news_tokens = news_string.strip().split()
@@ -87,7 +87,7 @@ class EncoderDecoder(nn.Module):
                                                torch.LongTensor([len(news_seq)]))
         idxs = idxs.data.view(-1)
         eos_idx = list(idxs).index(2) if 2 in list(idxs) else len(idxs)
-        output_string = seq_to_string(idxs[:eos_idx + 1], idx_to_tok, input_tokens=input_tokens)
+        output_string = seq_to_string(idxs[:eos_idx + 1], idx_to_tok, input_tokens=tweet_tokens + news_tokens)
 
         return output_string
 

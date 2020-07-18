@@ -234,6 +234,9 @@ if __name__ == '__main__':
     parser.add_argument('--model_dump_path', type=str,
                         help='The name of a directory of contains encoder and decoder model files.')
 
+    parser.add_argument('--log_dir', type=str,
+                        help='The path to logs directory.')
+
     parser.add_argument('--scheduled_teacher_forcing', action='store_true',
                         help='Linearly decrease the teacher forcing fraction '
                              'from 1.0 to 0.0 over the specified number of epocs')
@@ -256,7 +259,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_news_len', type=int, default=200,
                         help='News will be padded or truncated to this size.')
 
-    parser.add_argument('--max_hashtag_len', type=int, default=200,
+    parser.add_argument('--max_hashtag_len', type=int, default=10,
                         help='Hashtag sequences will be padded or truncated to this size.')
 
     parser.add_argument('--vocab_limit', type=int, default=10000,
@@ -279,7 +282,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    writer = SummaryWriter('./logs/%s_%s' % (args.model_name, str(int(time.time()))))
+    writer = SummaryWriter(args.log_dir + '%s_%s' % (args.model_name, str(int(time.time()))))
     if args.scheduled_teacher_forcing:
         schedule = np.arange(1.0, 0.0, -1.0 / args.epochs)
     else:
