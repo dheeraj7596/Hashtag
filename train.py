@@ -72,10 +72,13 @@ def train(encoder_decoder: EncoderDecoder,
                 news_string = "leading catholic publication turns on brett kavanaugh says his nomination to the supreme court should be withdrawn"
                 output_string = encoder_decoder.get_response(tweet_string, news_string)
                 writer.add_text('kavanaugh', output_string, global_step=global_step)
+                print("Global Step: ", global_step, ' kavanaugh ', output_string)
 
             if global_step % 100 == 0:
                 writer.add_scalar('train_batch_loss', batch_loss, global_step)
                 writer.add_scalar('train_batch_bleu_score', batch_bleu_score, global_step)
+                print("Global Step: ", global_step, ' train_batch_loss ', batch_loss)
+                print("Global Step: ", global_step, ' train_batch_bleu_score ', batch_bleu_score)
 
                 # for tag, value in encoder_decoder.named_parameters():
                 #     tag = tag.replace('.', '/')
@@ -101,6 +104,7 @@ def train(encoder_decoder: EncoderDecoder,
         news_string = "leading catholic publication turns on brett kavanaugh says his nomination to the supreme court should be withdrawn"
         output_string = encoder_decoder.get_response(tweet_string, news_string)
         writer.add_text('kavanaugh', output_string, global_step=global_step)
+        print("Global Step: ", global_step, ' kavanaugh ', output_string)
 
         print('val loss: %.5f, val BLEU score: %.5f' % (val_loss, val_bleu_score), flush=True)
         torch.save(encoder_decoder, "%s%s_%i.pt" % (model_path, model_name, epoch))
@@ -240,7 +244,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.001,
                         help='Learning rate.')
 
-    parser.add_argument('--encoder_type', type=str, default='copy',
+    parser.add_argument('--encoder_type', type=str, default='biattention',
                         help="Allowed values 'rnn' or 'biattention'")
 
     parser.add_argument('--decoder_type', type=str, default='copy',

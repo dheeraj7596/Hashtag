@@ -33,7 +33,7 @@ def evaluate(encoder_decoder: EncoderDecoder, data_loader):
         all_output_seqs.extend(trim_seqs(output_seqs))
         all_target_seqs.extend([list(seq[seq > 0])] for seq in to_np(target_idxs))
 
-        flattened_log_probs = output_log_probs.view(batch_size * encoder_decoder.decoder.max_length, -1)
+        flattened_log_probs = output_log_probs.view(batch_size * encoder_decoder.decoder.max_hashtag_length, -1)
         batch_losses = loss_function(flattened_log_probs, target_idxs.contiguous().view(-1))
         losses.extend(list(to_np(batch_losses)))
 
