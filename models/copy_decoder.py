@@ -53,8 +53,12 @@ class CopyDecoder(nn.Module):
         hidden = torch.zeros(1, batch_size, self.hidden_size)  # overwrite the encoder hidden state with zeros
         if next(self.parameters()).is_cuda:
             hidden = hidden.cuda()
+            tweet_coverage_vec = tweet_coverage_vec.cuda()
+            news_coverage_vec = news_coverage_vec.cuda()
         else:
             hidden = hidden
+            tweet_coverage_vec = tweet_coverage_vec
+            news_coverage_vec = news_coverage_vec
 
         # every decoder output seq starts with <SOS>
         sos_output = torch.zeros(
@@ -154,6 +158,8 @@ class CopyDecoder(nn.Module):
         output = self.out(output.squeeze(1))
         output = F.softmax(output, dim=1)
         append_for_copy = torch.zeros((batch_size, lengths_tweets.max() + lengths_news.max()))
+        if next(self.parameters()).is_cuda:
+            append_for_copy = append_for_copy.cuda()
         output = torch.cat([output, append_for_copy], dim=-1)
 
         p_gen = F.sigmoid(self.gen_context_linear(context) +
@@ -181,6 +187,8 @@ class CopyDecoder(nn.Module):
         p_copy_news = temp[:, 2].unsqueeze(1)
 
         probs = torch.zeros(batch_size, vocab_size + lengths_tweets.max() + lengths_news.max())
+        if next(self.parameters()).is_cuda:
+            probs = probs.cuda()
         tweet_copy_probabilities = torch.zeros_like(probs)
         tweet_copy_probabilities.scatter_add_(1, input_tweets, copy_tweet_attn_weights.squeeze(1))
 

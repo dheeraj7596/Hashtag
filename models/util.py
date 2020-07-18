@@ -50,7 +50,11 @@ def seq_to_string(seq, idx_to_tok, input_tokens=None):
             else:
                 words.append(idx_to_tok[idx])
         elif input_tokens is not None:
-            words.append(input_tokens[idx - vocab_size])
+            try:
+                words.append(input_tokens[idx - vocab_size])
+            except:
+                print("Index out of bound reached while decoding")
+                words.append('<???>')
         else:
             words.append('<???>')
     string = ' '.join(words)
