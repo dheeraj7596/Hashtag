@@ -280,7 +280,15 @@ if __name__ == '__main__':
     parser.add_argument('--news_cov_loss_factor', type=float, default=1,
                         help='News coverage loss factor')
 
+    parser.add_argument('--gpu_id', type=str, default="0",
+                        help='gpu id to use')
+
     args = parser.parse_args()
+
+    import os
+
+    if args.use_cuda:
+        os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
 
     writer = SummaryWriter(args.log_dir + '%s_%s' % (args.model_name, str(int(time.time()))))
     if args.scheduled_teacher_forcing:
