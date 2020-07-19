@@ -67,7 +67,7 @@ def train(encoder_decoder: EncoderDecoder,
             batch_bleu_score = corpus_bleu(batch_targets, batch_outputs, smoothing_function=SmoothingFunction().method1)
 
             if global_step < 10 or (global_step % 10 == 0 and global_step < 100) or (
-                    global_step % 100 == 0 and epoch < 2):
+                    global_step % 100 == 0):
                 tweet_string = "do you think brett kavanaugh should be confirmed as a justice on the supreme court"
                 news_string = "leading catholic publication turns on brett kavanaugh says his nomination to the supreme court should be withdrawn"
                 output_string = encoder_decoder.get_response(tweet_string, news_string)
