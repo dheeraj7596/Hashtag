@@ -149,7 +149,7 @@ class CopyDecoder(nn.Module):
             1)  # apply softmax to scores to get normalized weights
         context = torch.bmm(attn_weights, encoder_outputs)  # weighted sum of encoder_outputs (i.e. values)
 
-        rnn_input = torch.cat((context, embedded), dim=2)
+        rnn_input = torch.cat((embedded, context), dim=2)
         if dropout_mask is not None:
             if next(self.parameters()).is_cuda:
                 dropout_mask = dropout_mask.cuda()
@@ -171,8 +171,8 @@ class CopyDecoder(nn.Module):
         tweet_encoder_outputs = encoder_outputs[:, :lengths_tweets.max(), :]
         news_encoder_outputs = encoder_outputs[:, lengths_tweets.max():, :]
 
-        copy_tweet_attn_weights = attn_weights[:, :, :lengths_tweets.max()]
-        copy_news_attn_weights = attn_weights[:, :, lengths_tweets.max():]
+        copy_tweet_attn_weights = F.softmax(attn_weights[:, :, :lengths_tweets.max()], dim=-1)
+        copy_news_attn_weights = F.softmax(attn_weights[:, :, lengths_tweets.max():], dim=-1)
 
         p_copy_tweets = self.copy_from_source(tweet_encoder_outputs,
                                               copy_tweet_attn_weights,

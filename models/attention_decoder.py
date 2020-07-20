@@ -88,7 +88,7 @@ class AttentionDecoder(nn.Module):
         attn_weights = F.softmax(scores, dim=1).unsqueeze(1)  # apply softmax to scores to get normalized weights
         context = torch.bmm(attn_weights, encoder_outputs)  # weighted sum of encoder_outputs (i.e. values)
 
-        rnn_input = torch.cat((context, embedded), dim=2)
+        rnn_input = torch.cat((embedded, context), dim=2)
         if dropout_mask is not None:
             if next(self.parameters()).is_cuda:
                 dropout_mask = dropout_mask.cuda()

@@ -44,7 +44,7 @@ class Language(object):
 
 
 class TweetNewsDataset(Dataset):
-    def __init__(self, data_dir, use_cuda, lang=None, max_tweet_len=128, max_news_len=100, max_hashtag_len=100,
+    def __init__(self, data_dir, use_cuda, lang=None, max_tweet_len=128, max_news_len=100, max_hashtag_len=10,
                  vocab_limit=None, use_extended_vocab=True):
         self.data_dir = data_dir
         self.tweet_file = self.data_dir + "/tweets.txt"
@@ -114,7 +114,7 @@ if __name__ == '__main__':
     # todo make all the news in one file
     # todo make all the hashtags in one file with one hashtag per line
 
-    dataset = TweetNewsDataset("./data/train/", use_cuda=False)
+    dataset = TweetNewsDataset("./data/dummy_train/", use_cuda=False)
     data_loader = DataLoader(dataset, batch_size=128, shuffle=True)
     count = 0
     for tweet_seq, news_seq, output_seq, tweet_str, news_str, hashtag_str in data_loader:
