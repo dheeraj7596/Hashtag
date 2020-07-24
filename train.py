@@ -87,7 +87,8 @@ def train(encoder_decoder: EncoderDecoder,
 
             global_step += 1
 
-        val_loss, val_bleu_score = evaluate(encoder_decoder, val_data_loader)
+        with torch.no_grad():
+            val_loss, val_bleu_score = evaluate(encoder_decoder, val_data_loader)
 
         writer.add_scalar('val_loss', val_loss, global_step=global_step)
         writer.add_scalar('val_bleu_score', val_bleu_score, global_step=global_step)
