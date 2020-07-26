@@ -61,6 +61,10 @@ class AttentionDecoder(nn.Module):
         final_decoder_outputs.fill_(math.log(self.EPS))
         final_sampled_idxs = torch.zeros(batch_size, self.max_hashtag_length, 1)
 
+        if next(self.parameters()).is_cuda:
+            final_decoder_outputs = final_decoder_outputs.cuda()
+            final_sampled_idxs = final_sampled_idxs.cuda()
+
         for b_index in range(batch_size):
             sent_encoder_outputs = encoder_outputs[b_index, :, :].unsqueeze(0)
             hidden = torch.zeros(1, 1, self.hidden_size)  # overwrite the encoder hidden state with zeros
