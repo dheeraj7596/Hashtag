@@ -9,7 +9,8 @@ from models.copy_decoder import CopyDecoder
 
 class EncoderDecoder(nn.Module):
     def __init__(self, lang, max_tweet_length, max_news_length, max_hashtag_length, hidden_size, embedding_size,
-                 encoder_type, decoder_type, tweet_cov_loss_factor=0, news_cov_loss_factor=0):
+                 encoder_type, decoder_type, decode_strategy, beam_width, tweet_cov_loss_factor=0,
+                 news_cov_loss_factor=0):
         super(EncoderDecoder, self).__init__()
 
         self.lang = lang
@@ -33,7 +34,9 @@ class EncoderDecoder(nn.Module):
             self.decoder = AttentionDecoder(hidden_size=decoder_hidden_size,
                                             embedding_size=embedding_size,
                                             lang=lang,
-                                            max_hashtag_length=max_hashtag_length)
+                                            max_hashtag_length=max_hashtag_length,
+                                            decode_strategy=decode_strategy,
+                                            beam_width=beam_width)
         elif self.decoder_type == 'copy':
             self.decoder = CopyDecoder(hidden_size=decoder_hidden_size,
                                        embedding_size=embedding_size,

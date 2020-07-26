@@ -114,17 +114,17 @@ def train(encoder_decoder: EncoderDecoder,
 
 
 def main(model_name, model_dump_path, train_dir, val_dir, use_cuda, batch_size, teacher_forcing_schedule, keep_prob,
-         lr, encoder_type, decoder_type, max_tweet_len, max_news_len, max_hashtag_len, vocab_limit,
-         hidden_size, embedding_size, tweet_cov_loss_factor, news_cov_loss_factor, seed=42):
+         lr, encoder_type, decoder_type, decode_strategy, beam_width, max_tweet_len, max_news_len, max_hashtag_len,
+         vocab_limit, hidden_size, embedding_size, tweet_cov_loss_factor, news_cov_loss_factor, seed=42):
     model_path = model_dump_path + model_name + '/'
 
     print("training %s with use_cuda=%s, batch_size=%i" % (model_name, use_cuda, batch_size), flush=True)
     print("teacher_forcing_schedule=", teacher_forcing_schedule, flush=True)
     print(
-        "train_dir=%s, val_dir=%s, keep_prob=%f, lr=%f, encoder_type=%s, decoder_type=%s, vocab_limit=%i, hidden_size=%i, embedding_size=%i, max_tweetlength=%i, max_newslength=%i, max_hashtaglength=%i, tweet_cov_loss_factor=%f, news_cov_loss_factor=%f, seed=%i" % (
-            train_dir, val_dir, keep_prob, lr, encoder_type, decoder_type, vocab_limit, hidden_size,
-            embedding_size, max_tweet_len, max_news_len, max_hashtag_len, tweet_cov_loss_factor, news_cov_loss_factor,
-            seed),
+        "train_dir=%s, val_dir=%s, keep_prob=%f, lr=%f, encoder_type=%s, decoder_type=%s, decode_strategy=%s, beam_width=%d, vocab_limit=%i, hidden_size=%i, embedding_size=%i, max_tweetlength=%i, max_newslength=%i, max_hashtaglength=%i, tweet_cov_loss_factor=%f, news_cov_loss_factor=%f, seed=%i" % (
+            train_dir, val_dir, keep_prob, lr, encoder_type, decoder_type, decode_strategy, beam_width, vocab_limit,
+            hidden_size, embedding_size, max_tweet_len, max_news_len, max_hashtag_len, tweet_cov_loss_factor,
+            news_cov_loss_factor, seed),
         flush=True)
 
     if os.path.isdir(model_path):
@@ -182,6 +182,8 @@ def main(model_name, model_dump_path, train_dir, val_dir, use_cuda, batch_size, 
                                          embedding_size=embedding_size,
                                          encoder_type=encoder_type,
                                          decoder_type=decoder_type,
+                                         decode_strategy=decode_strategy,
+                                         beam_width=beam_width,
                                          tweet_cov_loss_factor=tweet_cov_loss_factor,
                                          news_cov_loss_factor=news_cov_loss_factor
                                          )
@@ -254,6 +256,12 @@ if __name__ == '__main__':
     parser.add_argument('--decoder_type', type=str, default='copy',
                         help="Allowed values 'copy' or 'attn'")
 
+    parser.add_argument('--decode_strategy', type=str, default='greedy',
+                        help="Allowed values 'beam' or 'greedy'")
+
+    parser.add_argument('--beam_width', type=int, default=4,
+                        help="Beam size.")
+
     parser.add_argument('--max_tweet_len', type=int, default=200,
                         help="Tweets will be padded or truncated to this size.")
 
@@ -298,6 +306,6 @@ if __name__ == '__main__':
         schedule = np.ones(args.epochs) * args.teacher_forcing_fraction
 
     main(args.model_name, args.model_dump_path, args.train_dir, args.val_dir, args.use_cuda, args.batch_size,
-         schedule, args.keep_prob, args.lr, args.encoder_type, args.decoder_type, args.max_tweet_len,
-         args.max_news_len, args.max_hashtag_len, args.vocab_limit, args.hidden_size, args.embedding_size,
-         args.tweet_cov_loss_factor, args.news_cov_loss_factor)
+         schedule, args.keep_prob, args.lr, args.encoder_type, args.decoder_type, args.decode_strategy,
+         args.beam_width, args.max_tweet_len, args.max_news_len, args.max_hashtag_len, args.vocab_limit,
+         args.hidden_size, args.embedding_size, args.tweet_cov_loss_factor, args.news_cov_loss_factor)
