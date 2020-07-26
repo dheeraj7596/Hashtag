@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch import optim
 from torch.utils.data import DataLoader
-
+from transformers import AdamW
 from dataset import TweetNewsDataset
 from models.encoder_decoder import EncoderDecoder
 from evaluate import evaluate
@@ -30,12 +30,17 @@ def train(encoder_decoder: EncoderDecoder,
           patience):
     global_step = 0
     loss_function = torch.nn.NLLLoss(ignore_index=0)
-    optimizer = optim.Adam(encoder_decoder.parameters(), lr=lr)
+    optimizer = AdamW(encoder_decoder.parameters(),
+                      lr=lr,  # args.learning_rate - default is 5e-5, our notebook had 2e-5
+                      eps=1e-8  # args.adam_epsilon  - default is 1e-8.
+                      )
+    # optimizer = optim.Adam(encoder_decoder.parameters(), lr=lr)
     model_path = model_dump_path + model_name + '/'
     history = {
         'val_loss': [],
         'best_epoch': -1,
-        'best_loss': float("inf")
+        'best_loss': float("inf"),
+        'prev_loss': float("inf")
     }
 
     for epoch, teacher_forcing in enumerate(teacher_forcing_schedule):
@@ -120,13 +125,14 @@ def train(encoder_decoder: EncoderDecoder,
 
         print('-' * 100, flush=True)
 
-        if history['val_loss'][-1] < history['best_loss']:
+        if history['val_loss'][-1] < history['best_loss'] or history['val_loss'][-1] < history['prev_loss']:
             history['best_loss'] = history['val_loss'][-1]
             history['best_epoch'] = epoch
         elif early_stopping and epoch - history['best_epoch'] > patience:
             # early stopping
             print("Early stopping at epoch {0}, best result at epoch {1}".format(epoch, history['best_epoch']))
             break
+        history['prev_loss'] = history['val_loss'][-1]
 
 
 def main(model_name, model_dump_path, train_dir, val_dir, use_cuda, batch_size, teacher_forcing_schedule, keep_prob,
