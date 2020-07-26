@@ -25,11 +25,18 @@ def train(encoder_decoder: EncoderDecoder,
           keep_prob,
           teacher_forcing_schedule,
           lr,
-          max_length):
+          max_length,
+          early_stopping,
+          patience):
     global_step = 0
     loss_function = torch.nn.NLLLoss(ignore_index=0)
     optimizer = optim.Adam(encoder_decoder.parameters(), lr=lr)
     model_path = model_dump_path + model_name + '/'
+    history = {
+        'val_loss': [],
+        'best_epoch': -1,
+        'best_loss': float("inf")
+    }
 
     for epoch, teacher_forcing in enumerate(teacher_forcing_schedule):
         print('epoch %i' % epoch, flush=True)
@@ -89,6 +96,7 @@ def train(encoder_decoder: EncoderDecoder,
 
         with torch.no_grad():
             val_loss, val_bleu_score = evaluate(encoder_decoder, val_data_loader)
+            history["val_loss"].append(val_loss)
 
         writer.add_scalar('val_loss', val_loss, global_step=global_step)
         writer.add_scalar('val_bleu_score', val_bleu_score, global_step=global_step)
@@ -112,19 +120,28 @@ def train(encoder_decoder: EncoderDecoder,
 
         print('-' * 100, flush=True)
 
+        if history['val_loss'][-1] < history['best_loss']:
+            history['best_loss'] = history['val_loss'][-1]
+            history['best_epoch'] = epoch
+        elif early_stopping and epoch - history['best_epoch'] > patience:
+            # early stopping
+            print("Early stopping at epoch {0}, best result at epoch {1}".format(epoch, history['best_epoch']))
+            break
+
 
 def main(model_name, model_dump_path, train_dir, val_dir, use_cuda, batch_size, teacher_forcing_schedule, keep_prob,
          lr, encoder_type, decoder_type, decode_strategy, beam_width, max_tweet_len, max_news_len, max_hashtag_len,
-         vocab_limit, hidden_size, embedding_size, tweet_cov_loss_factor, news_cov_loss_factor, seed=42):
+         vocab_limit, hidden_size, embedding_size, tweet_cov_loss_factor, news_cov_loss_factor, early_stopping,
+         patience, seed=42):
     model_path = model_dump_path + model_name + '/'
 
     print("training %s with use_cuda=%s, batch_size=%i" % (model_name, use_cuda, batch_size), flush=True)
     print("teacher_forcing_schedule=", teacher_forcing_schedule, flush=True)
     print(
-        "train_dir=%s, val_dir=%s, keep_prob=%f, lr=%f, encoder_type=%s, decoder_type=%s, decode_strategy=%s, beam_width=%d, vocab_limit=%i, hidden_size=%i, embedding_size=%i, max_tweetlength=%i, max_newslength=%i, max_hashtaglength=%i, tweet_cov_loss_factor=%f, news_cov_loss_factor=%f, seed=%i" % (
+        "train_dir=%s, val_dir=%s, keep_prob=%f, lr=%f, encoder_type=%s, decoder_type=%s, decode_strategy=%s, beam_width=%i, vocab_limit=%i, hidden_size=%i, embedding_size=%i, max_tweetlength=%i, max_newslength=%i, max_hashtaglength=%i, tweet_cov_loss_factor=%f, news_cov_loss_factor=%f, patience=%i, seed=%i" % (
             train_dir, val_dir, keep_prob, lr, encoder_type, decoder_type, decode_strategy, beam_width, vocab_limit,
             hidden_size, embedding_size, max_tweet_len, max_news_len, max_hashtag_len, tweet_cov_loss_factor,
-            news_cov_loss_factor, seed),
+            news_cov_loss_factor, patience, seed),
         flush=True)
 
     if os.path.isdir(model_path):
@@ -206,7 +223,9 @@ def main(model_name, model_dump_path, train_dir, val_dir, use_cuda, batch_size, 
           keep_prob,
           teacher_forcing_schedule,
           lr,
-          encoder_decoder.decoder.max_hashtag_length)
+          encoder_decoder.decoder.max_hashtag_length,
+          early_stopping,
+          patience)
 
 
 if __name__ == '__main__':
@@ -243,6 +262,12 @@ if __name__ == '__main__':
     parser.add_argument('--scheduled_teacher_forcing', action='store_true',
                         help='Linearly decrease the teacher forcing fraction '
                              'from 1.0 to 0.0 over the specified number of epocs')
+
+    parser.add_argument('--early_stopping', action='store_true',
+                        help='Enable/Disable earlystopping')
+
+    parser.add_argument('--patience', type=int, default=3,
+                        help="Patience in early stopping")
 
     parser.add_argument('--keep_prob', type=float, default=1.0,
                         help='Probablity of keeping an element in the dropout step.')
@@ -308,4 +333,5 @@ if __name__ == '__main__':
     main(args.model_name, args.model_dump_path, args.train_dir, args.val_dir, args.use_cuda, args.batch_size,
          schedule, args.keep_prob, args.lr, args.encoder_type, args.decoder_type, args.decode_strategy,
          args.beam_width, args.max_tweet_len, args.max_news_len, args.max_hashtag_len, args.vocab_limit,
-         args.hidden_size, args.embedding_size, args.tweet_cov_loss_factor, args.news_cov_loss_factor)
+         args.hidden_size, args.embedding_size, args.tweet_cov_loss_factor, args.news_cov_loss_factor,
+         args.early_stopping, args.patience)
