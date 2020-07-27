@@ -44,6 +44,8 @@ class EncoderDecoder(nn.Module):
                                        max_tweet_length=max_tweet_length,
                                        max_news_length=max_news_length,
                                        max_hashtag_length=max_hashtag_length,
+                                       decode_strategy=decode_strategy,
+                                       beam_width=beam_width,
                                        tweet_cov_loss_factor=tweet_cov_loss_factor,
                                        news_cov_loss_factor=news_cov_loss_factor)
         else:
