@@ -73,6 +73,7 @@ def main(test_dir, model_path, use_cuda, max_tweet_len, max_news_len, max_hashta
     with open(out_file_path, "w") as f:
         for t in translations:
             f.write(t)
+            f.write("\n")
 
 
 if __name__ == '__main__':
