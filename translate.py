@@ -13,6 +13,7 @@ def translate(encoder_decoder, test_data_loader, beam_width, n_best):
     assert beam_width >= n_best
 
     idx_to_tok = encoder_decoder.lang.idx_to_tok
+    translations = []
     for batch_idx, (tweet_idxs, news_idxs, target_idxs, tweet_tokens, news_tokens, hashtag_tokens) in enumerate(
             tqdm(test_data_loader)):
         tweet_lengths = (tweet_idxs != 0).long().sum(dim=1)
@@ -28,7 +29,6 @@ def translate(encoder_decoder, test_data_loader, beam_width, n_best):
                                                                   n_best=n_best)
         output_seqs = output_seqs.squeeze(-1)  # (b_size x n_best x max_hashtag_length)
 
-        translations = []
         for b_index in range(batch_size):
             tweet_tokens_list = tweet_tokens[b_index].split()
             news_tokens_list = news_tokens[b_index].split()
@@ -43,7 +43,7 @@ def translate(encoder_decoder, test_data_loader, beam_width, n_best):
                 n_best_translations.append(output_string)
 
             translations.append(";".join(n_best_translations))
-        return translations
+    return translations
 
 
 def main(test_dir, model_path, use_cuda, max_tweet_len, max_news_len, max_hashtag_len, batch_size, out_file_path,
