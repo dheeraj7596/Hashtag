@@ -49,7 +49,12 @@ def translate(encoder_decoder, test_data_loader, beam_width, n_best):
 def main(test_dir, model_path, use_cuda, max_tweet_len, max_news_len, max_hashtag_len, batch_size, out_file_path,
          beam_width, n_best):
     print("loading encoder and decoder from model_path", flush=True)
-    encoder_decoder = torch.load(model_path)
+    if use_cuda:
+        encoder_decoder = torch.load(model_path)
+        encoder_decoder = encoder_decoder.cuda()
+    else:
+        encoder_decoder = torch.load(model_path, map_location=torch.device('cpu'))
+        encoder_decoder = encoder_decoder.cpu()
 
     print("creating test datasets with saved languages", flush=True)
     test_dataset = TweetNewsDataset(data_dir=test_dir,
@@ -59,10 +64,6 @@ def main(test_dir, model_path, use_cuda, max_tweet_len, max_news_len, max_hashta
                                     max_news_len=max_news_len,
                                     max_hashtag_len=max_hashtag_len,
                                     use_extended_vocab=(encoder_decoder.decoder_type == 'copy'))
-    if use_cuda:
-        encoder_decoder = encoder_decoder.cuda()
-    else:
-        encoder_decoder = encoder_decoder.cpu()
 
     test_data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
