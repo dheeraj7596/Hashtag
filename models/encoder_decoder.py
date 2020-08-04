@@ -9,7 +9,7 @@ from models.copy_decoder import CopyDecoder
 
 class EncoderDecoder(nn.Module):
     def __init__(self, lang, max_tweet_length, max_news_length, max_hashtag_length, hidden_size, embedding_size,
-                 encoder_type, decoder_type, decode_strategy, beam_width, tweet_cov_loss_factor=0,
+                 encoder_type, decoder_type, decode_strategy, tweet_cov_loss_factor=0,
                  news_cov_loss_factor=0):
         super(EncoderDecoder, self).__init__()
 
@@ -35,8 +35,7 @@ class EncoderDecoder(nn.Module):
                                             embedding_size=embedding_size,
                                             lang=lang,
                                             max_hashtag_length=max_hashtag_length,
-                                            decode_strategy=decode_strategy,
-                                            beam_width=beam_width)
+                                            decode_strategy=decode_strategy)
         elif self.decoder_type == 'copy':
             self.decoder = CopyDecoder(hidden_size=decoder_hidden_size,
                                        embedding_size=embedding_size,
@@ -45,13 +44,12 @@ class EncoderDecoder(nn.Module):
                                        max_news_length=max_news_length,
                                        max_hashtag_length=max_hashtag_length,
                                        decode_strategy=decode_strategy,
-                                       beam_width=beam_width,
                                        tweet_cov_loss_factor=tweet_cov_loss_factor,
                                        news_cov_loss_factor=news_cov_loss_factor)
         else:
             raise ValueError("decoder_type must be 'attn' or 'copy'")
 
-    def forward(self, input_tweets, input_news, lengths_tweets, lengths_news, targets=None, keep_prob=1.0,
+    def forward(self, input_tweets, input_news, lengths_tweets, lengths_news, beam_width=4, targets=None, keep_prob=1.0,
                 teacher_forcing=0.0, n_best=1):
         encoder_outputs, hidden = self.encoder(input_tweets,
                                                input_news,
@@ -62,6 +60,7 @@ class EncoderDecoder(nn.Module):
                                                                input_tweets,
                                                                input_news,
                                                                hidden,
+                                                               beam_width,
                                                                lengths_tweets=lengths_tweets,
                                                                lengths_news=lengths_news,
                                                                targets=targets,

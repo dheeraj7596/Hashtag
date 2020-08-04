@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 class CopyDecoder(nn.Module):
     def __init__(self, hidden_size, embedding_size, lang: Language, max_tweet_length, max_news_length,
-                 max_hashtag_length, decode_strategy, beam_width, tweet_cov_loss_factor=0, news_cov_loss_factor=0):
+                 max_hashtag_length, decode_strategy, tweet_cov_loss_factor=0, news_cov_loss_factor=0):
         super().__init__()
         self.EPS = 1e-8
         self.EOS_ID = 2
@@ -20,7 +20,6 @@ class CopyDecoder(nn.Module):
         self.tweet_cov_loss_factor = tweet_cov_loss_factor
         self.news_cov_loss_factor = news_cov_loss_factor
         self.decode_strategy = decode_strategy
-        self.beam_width = beam_width
 
         self.embedding = nn.Embedding(len(lang.tok_to_idx), self.embedding_size, padding_idx=0)
         self.embedding.weight.data.normal_(0, 1 / self.embedding_size ** 0.5)
@@ -42,13 +41,14 @@ class CopyDecoder(nn.Module):
 
         self.gru = nn.GRU(self.hidden_size + self.embedding_size, self.hidden_size, batch_first=True)
 
-    def forward(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None,
+    def forward(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, beam_width, targets=None,
                 lengths_tweets=None, lengths_news=None, keep_prob=1.0, teacher_forcing=0.0):
         if self.decode_strategy == "beam":
             return self.beam_decode(encoder_outputs,
                                     input_tweets,
                                     input_news,
                                     final_encoder_hidden,
+                                    beam_width,
                                     lengths_tweets=lengths_tweets,
                                     lengths_news=lengths_news,
                                     targets=targets)
@@ -65,7 +65,7 @@ class CopyDecoder(nn.Module):
         else:
             raise ValueError("decoder_mode must be 'beam' or 'greedy'")
 
-    def beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None,
+    def beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, beam_width, targets=None,
                     lengths_tweets=None, lengths_news=None, keep_prob=1.0):
 
         def sort_hyps(list_of_hyps):
@@ -127,7 +127,7 @@ class CopyDecoder(nn.Module):
 
             finished_hypothesis = []
             for step_idx in range(1, self.max_hashtag_length):
-                if len(finished_hypothesis) >= self.beam_width:
+                if len(finished_hypothesis) >= beam_width:
                     break
                 new_hypothesis = []
                 for hyp in hypothesis:
@@ -163,8 +163,8 @@ class CopyDecoder(nn.Module):
                     new_coverage_loss = old_coverage_loss + tweet_cov_loss + news_cov_loss
                     new_sent_tweet_coverage_vec = sent_tweet_coverage_vec + temp_copy_tweet_attn_weights
                     new_news_coverage_vec = sent_news_coverage_vec + temp_copy_news_attn_weights
-                    probs, indices = torch.topk(output, dim=-1, k=self.beam_width)
-                    for i in range(self.beam_width):
+                    probs, indices = torch.topk(output, dim=-1, k=beam_width)
+                    for i in range(beam_width):
                         p = probs[:, i]
                         idx = indices[:, i]
                         new_dict = {
@@ -187,7 +187,7 @@ class CopyDecoder(nn.Module):
                             finished_hypothesis.append(hyp)
                     else:
                         hypothesis.append(hyp)
-                    if len(hypothesis) == self.beam_width or len(finished_hypothesis) == self.beam_width:
+                    if len(hypothesis) == beam_width or len(finished_hypothesis) == beam_width:
                         break
 
             if len(finished_hypothesis) > 0:

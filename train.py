@@ -27,7 +27,8 @@ def train(encoder_decoder: EncoderDecoder,
           lr,
           max_length,
           early_stopping,
-          patience):
+          patience,
+          beam_width):
     global_step = 0
     loss_function = torch.nn.NLLLoss(ignore_index=0)
     optimizer = AdamW(encoder_decoder.parameters(),
@@ -60,6 +61,7 @@ def train(encoder_decoder: EncoderDecoder,
                                                                       news_idxs,
                                                                       lengths_tweets,
                                                                       lengths_news,
+                                                                      beam_width,
                                                                       targets=target_idxs,
                                                                       keep_prob=keep_prob,
                                                                       teacher_forcing=teacher_forcing)
@@ -206,7 +208,6 @@ def main(model_name, model_dump_path, train_dir, val_dir, use_cuda, batch_size, 
                                          encoder_type=encoder_type,
                                          decoder_type=decoder_type,
                                          decode_strategy=decode_strategy,
-                                         beam_width=beam_width,
                                          tweet_cov_loss_factor=tweet_cov_loss_factor,
                                          news_cov_loss_factor=news_cov_loss_factor
                                          )
@@ -231,7 +232,8 @@ def main(model_name, model_dump_path, train_dir, val_dir, use_cuda, batch_size, 
           lr,
           encoder_decoder.decoder.max_hashtag_length,
           early_stopping,
-          patience)
+          patience,
+          beam_width)
 
 
 if __name__ == '__main__':

@@ -6,7 +6,7 @@ from dataset import Language
 
 
 class AttentionDecoder(nn.Module):
-    def __init__(self, hidden_size, embedding_size, lang: Language, max_hashtag_length, decode_strategy, beam_width):
+    def __init__(self, hidden_size, embedding_size, lang: Language, max_hashtag_length, decode_strategy):
         super(AttentionDecoder, self).__init__()
         self.EPS = 1e-8
         self.EOS_ID = 2
@@ -16,7 +16,6 @@ class AttentionDecoder(nn.Module):
         self.lang = lang
         self.max_hashtag_length = max_hashtag_length
         self.decode_strategy = decode_strategy
-        self.beam_width = beam_width
 
         self.embedding = nn.Embedding(len(lang.tok_to_idx), self.embedding_size, padding_idx=0)
         self.embedding.weight.data.normal_(0, 1 / self.embedding_size ** 0.5)
@@ -26,14 +25,15 @@ class AttentionDecoder(nn.Module):
         self.gru = nn.GRU(self.hidden_size + self.embedding_size, self.hidden_size, batch_first=True)
         self.out = nn.Linear(self.hidden_size, len(lang.tok_to_idx))
 
-    def forward(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None,
-                lengths_tweets=None, lengths_news=None, keep_prob=1.0, teacher_forcing=0.0, beam_width=4, n_best=1):
+    def forward(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, beam_width, targets=None,
+                lengths_tweets=None, lengths_news=None, keep_prob=1.0, teacher_forcing=0.0, n_best=1):
 
         if self.decode_strategy == "beam":
             return self.beam_decode(encoder_outputs,
                                     input_tweets,
                                     input_news,
                                     final_encoder_hidden,
+                                    beam_width,
                                     lengths_tweets=lengths_tweets,
                                     lengths_news=lengths_news,
                                     targets=targets,
@@ -50,28 +50,28 @@ class AttentionDecoder(nn.Module):
         else:
             raise ValueError("decoder_mode must be 'beam' or 'greedy'")
 
-    def beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None,
+    def beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, beam_width, targets=None,
                     lengths_tweets=None, lengths_news=None, keep_prob=1.0, n_best=1):
-        assert self.beam_width >= n_best
+        assert beam_width >= n_best
         beam_decoder_outputs, beam_sampled_idxs, _ = self.get_all_beam_decode(encoder_outputs, input_tweets,
                                                                               input_news, final_encoder_hidden,
-                                                                              targets=None,
+                                                                              beam_width, targets=None,
                                                                               lengths_tweets=None, lengths_news=None,
                                                                               keep_prob=1.0)
         return beam_decoder_outputs[:, :n_best, :, :].squeeze(1), beam_sampled_idxs[:, :n_best, :, :].squeeze(1), 0
 
-    def get_all_beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None,
-                            lengths_tweets=None, lengths_news=None, keep_prob=1.0):
+    def get_all_beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, beam_width,
+                            targets=None, lengths_tweets=None, lengths_news=None, keep_prob=1.0):
         # returns (b_size x beam_width x max_hashtag_length x vocab_size)
         def sort_hyps(list_of_hyps):
             return sorted(list_of_hyps, key=lambda x: sum(x["logprobs"]) / len(x["logprobs"]), reverse=True)
 
         batch_size = encoder_outputs.data.shape[0]
-        final_decoder_outputs = torch.zeros(batch_size, self.beam_width, self.max_hashtag_length,
+        final_decoder_outputs = torch.zeros(batch_size, beam_width, self.max_hashtag_length,
                                             self.embedding.num_embeddings)
         # since final_decoder_outputs contain final log softmax probs, initializing it with log of epsilon.
         final_decoder_outputs.fill_(math.log(self.EPS))
-        final_sampled_idxs = torch.zeros(batch_size, self.beam_width, self.max_hashtag_length, 1)
+        final_sampled_idxs = torch.zeros(batch_size, beam_width, self.max_hashtag_length, 1)
 
         if next(self.parameters()).is_cuda:
             final_decoder_outputs = final_decoder_outputs.cuda()
@@ -110,7 +110,7 @@ class AttentionDecoder(nn.Module):
 
             finished_hypothesis = []
             for step_idx in range(1, self.max_hashtag_length):
-                if len(finished_hypothesis) >= self.beam_width:
+                if len(finished_hypothesis) >= beam_width:
                     break
                 new_hypothesis = []
                 for hyp in hypothesis:
@@ -121,8 +121,8 @@ class AttentionDecoder(nn.Module):
                     old_decoder_outputs = hyp["decoder_outputs"]
 
                     output, hidden = self.step(iput, prev_hidden, sent_encoder_outputs, dropout_mask=dropout_mask)
-                    probs, indices = torch.topk(output, dim=-1, k=self.beam_width)
-                    for i in range(self.beam_width):
+                    probs, indices = torch.topk(output, dim=-1, k=beam_width)
+                    for i in range(beam_width):
                         p = probs[:, i]
                         idx = indices[:, i]
                         new_dict = {
@@ -142,7 +142,7 @@ class AttentionDecoder(nn.Module):
                             finished_hypothesis.append(hyp)
                     else:
                         hypothesis.append(hyp)
-                    if len(hypothesis) == self.beam_width or len(finished_hypothesis) == self.beam_width:
+                    if len(hypothesis) == beam_width or len(finished_hypothesis) == beam_width:
                         break
 
             if len(finished_hypothesis) > 0:
@@ -151,9 +151,9 @@ class AttentionDecoder(nn.Module):
                 final_candidates = hypothesis
 
             sorted_final_candidates = sort_hyps(final_candidates)
-            assert len(sorted_final_candidates) == self.beam_width
+            assert len(sorted_final_candidates) == beam_width
 
-            for i in range(self.beam_width):
+            for i in range(beam_width):
                 candidate = sorted_final_candidates[i]
                 sent_decoder_outputs = torch.stack(candidate["decoder_outputs"], dim=0).squeeze(1)
                 sent_sampled_idxs = torch.stack(candidate["sampled_idxs"], dim=0).squeeze(1)
