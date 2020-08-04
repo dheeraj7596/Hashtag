@@ -2,6 +2,7 @@ import torch
 from torch import nn
 from dataset import Language
 import torch.nn.functional as F
+import numpy as np
 
 
 class CopyDecoder(nn.Module):
@@ -42,7 +43,7 @@ class CopyDecoder(nn.Module):
         self.gru = nn.GRU(self.hidden_size + self.embedding_size, self.hidden_size, batch_first=True)
 
     def forward(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, beam_width, targets=None,
-                lengths_tweets=None, lengths_news=None, keep_prob=1.0, teacher_forcing=0.0):
+                lengths_tweets=None, lengths_news=None, keep_prob=1.0, teacher_forcing=0.0, n_best=1):
         if self.decode_strategy == "beam":
             return self.beam_decode(encoder_outputs,
                                     input_tweets,
@@ -51,7 +52,8 @@ class CopyDecoder(nn.Module):
                                     beam_width,
                                     lengths_tweets=lengths_tweets,
                                     lengths_news=lengths_news,
-                                    targets=targets)
+                                    targets=targets,
+                                    n_best=n_best)
 
         elif self.decode_strategy == "greedy":
             return self.greedy_decode(encoder_outputs,
@@ -65,8 +67,20 @@ class CopyDecoder(nn.Module):
         else:
             raise ValueError("decoder_mode must be 'beam' or 'greedy'")
 
-    def beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, beam_width, targets=None,
-                    lengths_tweets=None, lengths_news=None, keep_prob=1.0):
+    def beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, beam_width,
+                    targets=None, lengths_tweets=None, lengths_news=None, keep_prob=1.0, n_best=1):
+        assert beam_width >= n_best
+        beam_decoder_outputs, beam_sampled_idxs, cov_loss = self.get_all_beam_decode(encoder_outputs, input_tweets,
+                                                                                     input_news, final_encoder_hidden,
+                                                                                     beam_width, targets=None,
+                                                                                     lengths_tweets=None,
+                                                                                     lengths_news=None,
+                                                                                     keep_prob=1.0)
+        return beam_decoder_outputs[:, :n_best, :, :].squeeze(1), beam_sampled_idxs[:, :n_best, :, :].squeeze(1), \
+               cov_loss[0]
+
+    def get_all_beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, beam_width,
+                            targets=None, lengths_tweets=None, lengths_news=None, keep_prob=1.0):
 
         def sort_hyps(list_of_hyps):
             return sorted(list_of_hyps, key=lambda x: sum(x["logprobs"]) / len(x["logprobs"]), reverse=True)
@@ -78,10 +92,10 @@ class CopyDecoder(nn.Module):
         input_news = input_news[:, :lengths_news.max()]
 
         batch_size = encoder_outputs.data.shape[0]
-        final_decoder_outputs = torch.zeros(batch_size, self.max_hashtag_length,
+        final_decoder_outputs = torch.zeros(batch_size, beam_width, self.max_hashtag_length,
                                             self.embedding.num_embeddings + lengths_tweets.max() + lengths_news.max())
-        final_sampled_idxs = torch.zeros(batch_size, self.max_hashtag_length, 1)
-        final_coverage_loss = 0
+        final_sampled_idxs = torch.zeros(batch_size, beam_width, self.max_hashtag_length, 1)
+        final_coverage_loss = list(np.zeros(beam_width))
 
         if next(self.parameters()).is_cuda:
             final_decoder_outputs = final_decoder_outputs.cuda()
@@ -196,15 +210,18 @@ class CopyDecoder(nn.Module):
                 final_candidates = hypothesis
 
             sorted_final_candidates = sort_hyps(final_candidates)
-            best_candidate = sorted_final_candidates[0]
-            sent_decoder_outputs = torch.stack(best_candidate["decoder_outputs"], dim=0).squeeze(1)
-            sent_sampled_idxs = torch.stack(best_candidate["sampled_idxs"], dim=0).squeeze(1)
+            assert len(sorted_final_candidates) == beam_width
 
-            final_decoder_outputs[b_index, :sent_decoder_outputs.shape[0], :] = sent_decoder_outputs
-            final_sampled_idxs[b_index, :sent_sampled_idxs.shape[0], :] = sent_sampled_idxs
-            final_coverage_loss += best_candidate["coverage_loss"]
+            for i in range(beam_width):
+                candidate = sorted_final_candidates[i]
+                sent_decoder_outputs = torch.stack(candidate["decoder_outputs"], dim=0).squeeze(1)
+                sent_sampled_idxs = torch.stack(candidate["sampled_idxs"], dim=0).squeeze(1)
+                final_decoder_outputs[b_index, i, :sent_decoder_outputs.shape[0], :] = sent_decoder_outputs
+                final_sampled_idxs[b_index, i, :sent_sampled_idxs.shape[0], :] = sent_sampled_idxs
+                final_coverage_loss[i] += candidate["coverage_loss"]
 
-        final_coverage_loss = final_coverage_loss / (self.max_hashtag_length * batch_size)
+        for i in range(len(final_coverage_loss)):
+            final_coverage_loss[i] = final_coverage_loss[i] / (self.max_hashtag_length * batch_size)
         # Since we are using NLL loss, returning log probabilities
         return torch.log(final_decoder_outputs + self.EPS), final_sampled_idxs, final_coverage_loss
 
