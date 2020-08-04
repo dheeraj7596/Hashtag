@@ -70,7 +70,7 @@ def main(test_dir, model_path, use_cuda, max_tweet_len, max_news_len, max_hashta
     with torch.no_grad():
         translations = translate(encoder_decoder, test_data_loader, beam_width, n_best)
 
-    with open(out_file_path) as f:
+    with open(out_file_path, "w") as f:
         for t in translations:
             f.write(t)
 
