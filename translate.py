@@ -39,7 +39,8 @@ def translate(encoder_decoder, test_data_loader, beam_width, n_best):
                 eos_idx = list(idxs).index(2) if 2 in list(idxs) else len(idxs)
                 output_string = seq_to_string(idxs[:eos_idx + 1],
                                               idx_to_tok,
-                                              input_tokens=tweet_tokens_list + news_tokens_list)
+                                              input_tokens=tweet_tokens_list + news_tokens_list,
+                                              remove_eos_sos=True)
                 n_best_translations.append(output_string)
 
             translations.append(";".join(n_best_translations))

@@ -39,7 +39,7 @@ def tokens_to_seq(tokens, tok_to_idx, max_length, use_extended_vocab, input_toke
     return seq
 
 
-def seq_to_string(seq, idx_to_tok, input_tokens=None):
+def seq_to_string(seq, idx_to_tok, input_tokens=None, remove_eos_sos=False):
     vocab_size = len(idx_to_tok)
     seq_length = (seq != 0).sum()
     words = []
@@ -57,6 +57,9 @@ def seq_to_string(seq, idx_to_tok, input_tokens=None):
                 words.append('<???>')
         else:
             words.append('<???>')
+    if remove_eos_sos:
+        words.remove("<SOS>")
+        words.remove("<EOS>")
     string = ' '.join(words)
     return string
 
