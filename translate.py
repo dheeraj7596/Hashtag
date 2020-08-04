@@ -9,7 +9,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 
-def translate(encoder_decoder, test_data_loader, n_best):
+def translate(encoder_decoder, test_data_loader, beam_width, n_best):
+    assert beam_width >= n_best
+
     idx_to_tok = encoder_decoder.lang.idx_to_tok
     for batch_idx, (tweet_idxs, news_idxs, target_idxs, tweet_tokens, news_tokens, hashtag_tokens) in enumerate(
             tqdm(test_data_loader)):
@@ -22,7 +24,8 @@ def translate(encoder_decoder, test_data_loader, n_best):
                                                                   news_idxs,
                                                                   tweet_lengths,
                                                                   news_lengths,
-                                                                  n_best)
+                                                                  beam_width=beam_width,
+                                                                  n_best=n_best)
         output_seqs = output_seqs.squeeze(-1)  # (b_size x n_best x max_hashtag_length)
 
         translations = []
@@ -44,7 +47,7 @@ def translate(encoder_decoder, test_data_loader, n_best):
 
 
 def main(test_dir, model_path, use_cuda, max_tweet_len, max_news_len, max_hashtag_len, batch_size, out_file_path,
-         n_best):
+         beam_width, n_best):
     print("loading encoder and decoder from model_path", flush=True)
     encoder_decoder = torch.load(model_path)
 
@@ -64,7 +67,7 @@ def main(test_dir, model_path, use_cuda, max_tweet_len, max_news_len, max_hashta
     test_data_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
 
     with torch.no_grad():
-        translations = translate(encoder_decoder, test_data_loader, n_best)
+        translations = translate(encoder_decoder, test_data_loader, beam_width, n_best)
 
     with open(out_file_path) as f:
         for t in translations:
@@ -103,6 +106,9 @@ if __name__ == '__main__':
     arg_parser.add_argument('--out_file_path', type=str,
                             help='Output text file path to write the predicted hashtags')
 
+    arg_parser.add_argument('--beam_width', type=int, default=4,
+                            help='Number of beams in beam search')
+
     arg_parser.add_argument('--n_best', type=int, default=1,
                             help='Number of hashtags per tweet to be generated')
 
@@ -121,5 +127,6 @@ if __name__ == '__main__':
          args.max_hashtag_len,
          args.batch_size,
          args.out_file_path,
+         args.beam_width,
          args.n_best
          )
