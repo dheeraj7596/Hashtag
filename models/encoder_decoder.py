@@ -52,7 +52,7 @@ class EncoderDecoder(nn.Module):
             raise ValueError("decoder_type must be 'attn' or 'copy'")
 
     def forward(self, input_tweets, input_news, lengths_tweets, lengths_news, targets=None, keep_prob=1.0,
-                teacher_forcing=0.0):
+                teacher_forcing=0.0, n_best=1):
         encoder_outputs, hidden = self.encoder(input_tweets,
                                                input_news,
                                                lengths_tweets,
@@ -65,7 +65,8 @@ class EncoderDecoder(nn.Module):
                                                                lengths_tweets=lengths_tweets,
                                                                lengths_news=lengths_news,
                                                                targets=targets,
-                                                               teacher_forcing=teacher_forcing)
+                                                               teacher_forcing=teacher_forcing,
+                                                               n_best=n_best)
         return decoder_outputs, sampled_idxs, cov_loss
 
     def get_response(self, tweet_string, news_string):

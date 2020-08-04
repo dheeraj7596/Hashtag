@@ -66,7 +66,7 @@ def train(encoder_decoder: EncoderDecoder,
 
             batch_size = tweet_idxs.shape[0]
 
-            flattened_outputs = output_log_probs.view(batch_size * max_length, -1)
+            flattened_outputs = output_log_probs.contiguous().view(batch_size * max_length, -1)
 
             batch_loss = loss_function(flattened_outputs, target_idxs.contiguous().view(-1)) + cov_loss
             batch_loss.backward()

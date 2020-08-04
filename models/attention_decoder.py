@@ -27,7 +27,7 @@ class AttentionDecoder(nn.Module):
         self.out = nn.Linear(self.hidden_size, len(lang.tok_to_idx))
 
     def forward(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None,
-                lengths_tweets=None, lengths_news=None, keep_prob=1.0, teacher_forcing=0.0, beam_width=4):
+                lengths_tweets=None, lengths_news=None, keep_prob=1.0, teacher_forcing=0.0, beam_width=4, n_best=1):
 
         if self.decode_strategy == "beam":
             return self.beam_decode(encoder_outputs,
@@ -36,7 +36,8 @@ class AttentionDecoder(nn.Module):
                                     final_encoder_hidden,
                                     lengths_tweets=lengths_tweets,
                                     lengths_news=lengths_news,
-                                    targets=targets)
+                                    targets=targets,
+                                    n_best=n_best)
         elif self.decode_strategy == "greedy":
             return self.greedy_decode(encoder_outputs,
                                       input_tweets,
@@ -50,16 +51,27 @@ class AttentionDecoder(nn.Module):
             raise ValueError("decoder_mode must be 'beam' or 'greedy'")
 
     def beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None,
-                    lengths_tweets=None, lengths_news=None, keep_prob=1.0):
+                    lengths_tweets=None, lengths_news=None, keep_prob=1.0, n_best=1):
+        assert self.beam_width >= n_best
+        beam_decoder_outputs, beam_sampled_idxs, _ = self.get_all_beam_decode(encoder_outputs, input_tweets,
+                                                                              input_news, final_encoder_hidden,
+                                                                              targets=None,
+                                                                              lengths_tweets=None, lengths_news=None,
+                                                                              keep_prob=1.0)
+        return beam_decoder_outputs[:, :n_best, :, :].squeeze(1), beam_sampled_idxs[:, :n_best, :, :].squeeze(1), 0
 
+    def get_all_beam_decode(self, encoder_outputs, input_tweets, input_news, final_encoder_hidden, targets=None,
+                            lengths_tweets=None, lengths_news=None, keep_prob=1.0):
+        # returns (b_size x beam_width x max_hashtag_length x vocab_size)
         def sort_hyps(list_of_hyps):
             return sorted(list_of_hyps, key=lambda x: sum(x["logprobs"]) / len(x["logprobs"]), reverse=True)
 
         batch_size = encoder_outputs.data.shape[0]
-        final_decoder_outputs = torch.zeros(batch_size, self.max_hashtag_length, self.embedding.num_embeddings)
+        final_decoder_outputs = torch.zeros(batch_size, self.beam_width, self.max_hashtag_length,
+                                            self.embedding.num_embeddings)
         # since final_decoder_outputs contain final log softmax probs, initializing it with log of epsilon.
         final_decoder_outputs.fill_(math.log(self.EPS))
-        final_sampled_idxs = torch.zeros(batch_size, self.max_hashtag_length, 1)
+        final_sampled_idxs = torch.zeros(batch_size, self.beam_width, self.max_hashtag_length, 1)
 
         if next(self.parameters()).is_cuda:
             final_decoder_outputs = final_decoder_outputs.cuda()
@@ -139,12 +151,14 @@ class AttentionDecoder(nn.Module):
                 final_candidates = hypothesis
 
             sorted_final_candidates = sort_hyps(final_candidates)
-            best_candidate = sorted_final_candidates[0]
-            sent_decoder_outputs = torch.stack(best_candidate["decoder_outputs"], dim=0).squeeze(1)
-            sent_sampled_idxs = torch.stack(best_candidate["sampled_idxs"], dim=0).squeeze(1)
+            assert len(sorted_final_candidates) == self.beam_width
 
-            final_decoder_outputs[b_index, :sent_decoder_outputs.shape[0], :] = sent_decoder_outputs
-            final_sampled_idxs[b_index, :sent_sampled_idxs.shape[0], :] = sent_sampled_idxs
+            for i in range(self.beam_width):
+                candidate = sorted_final_candidates[i]
+                sent_decoder_outputs = torch.stack(candidate["decoder_outputs"], dim=0).squeeze(1)
+                sent_sampled_idxs = torch.stack(candidate["sampled_idxs"], dim=0).squeeze(1)
+                final_decoder_outputs[b_index, i, :sent_decoder_outputs.shape[0], :] = sent_decoder_outputs
+                final_sampled_idxs[b_index, i, :sent_sampled_idxs.shape[0], :] = sent_sampled_idxs
 
         return final_decoder_outputs, final_sampled_idxs, 0
 
